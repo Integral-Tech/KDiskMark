@@ -6,7 +6,9 @@
 #include <PolkitQt1/Authority>
 #include <PolkitQt1/Subject>
 
+#include <linux/fs.h>
 #include <signal.h>
+#include <sys/ioctl.h>
 
 HelperAdaptor::HelperAdaptor(Helper *parent) :
     QDBusAbstractAdaptor(parent)
@@ -197,6 +199,15 @@ QVariantMap Helper::startBenchmarkTest(int measuringTime, int fileSize, int rand
     if (m_benchmarkFile.fileName().isNull() || !QFile(m_benchmarkFile.fileName()).exists()) {
         return {{"success", false}, {"error", "The benchmark file was not pre-created."}};
     }
+
+    int attr;
+    int fd = m_benchmarkFile.handle();
+    volatile int ret1 = ioctl(fd, FS_IOC_GETFLAGS, &attr);
+
+    attr |= FS_NOCOW_FL;
+    volatile int ret2 = ioctl(fd, FS_IOC_SETFLAGS, &attr);
+
+    ioctl(fd, BLKFLSBUF);
 
     m_process = new QProcess();
     m_process->start("fio", QStringList()
